@@ -1,20 +1,146 @@
-# Reproducible Research: Peer Assessment 1
+Reproducible Research/ Peer Assessment 1
+========================================================
+This assignment makes use of data from a personal activity monitoring device. This device collects data at 5 minute intervals through out the day. The data consists of two months of data from an anonymous individual collected during the months of October and November, 2012 and include the number of steps taken in 5 minute intervals each day.
 
+**The variables included in this dataset are:**
 
-## Loading and preprocessing the data
+-**steps**: Number of steps taking in a 5-minute interval (missing values are coded as NA)
 
+-**date**: The date on which the measurement was taken in YYYY-MM-DD format
 
+-**interval**: Identifier for the 5-minute interval in which measurement was taken
 
-## What is mean total number of steps taken per day?
+The dataset is stored in a comma-separated-value (CSV) file and there are a total of 17,568 observations in this dataset.
 
+## 1.Loading and preprocessing the data
 
+We use read.csv to read the data from file. The wroking directory is set to the folder which includes the data. Also we use "as.Date" function to convert the data to the class "Date". 
+Here we can see the code and first few rwos of the data as well as the number of observations which is  17568.
+```{r}
+data<-read.csv("./activity.csv",sep=",")
+data$date<-as.Date(data$date,"%Y-%m-%d")
+head(data)
+nrow(data)
+```
 
-## What is the average daily activity pattern?
+## 2.What is mean total number of steps taken per day?
 
+In order to reshape the data to calculate the total number of steps taken per day we would like to use the "melt" and "dcast" functions, consequently we need to install and load the "reshape2" package.
 
+*Note that in this section we can ignore the NA values.*
 
-## Imputing missing values
+Now we can "melt" the data and calculate the sum for our variable values and create a new data frame:
 
+```{r}
+install.packages("reshape2")
+library(reshape2)
+datamelt<-melt(data,id=c("date"),measure.vars=c("steps"),na.rm=TRUE)
+data_sum<-dcast(datamelt,date~variable,sum)
+head(data_sum)
+```
 
+Now with our new data frame we can create our histogram of the total number of steps taken each day:
 
-## Are there differences in activity patterns between weekdays and weekends?
+```{r  fig.width=7, fig.height=6}
+hist(data_sum$steps,col="green",xlab="", main="Histogram")
+```
+
+The mean and the median total number of steps taken per day are calculated as below: 
+```{r}
+mean(data_sum$steps)
+```
+
+```{r}
+median(data_sum$steps)
+```
+
+## 3.What is the average daily activity pattern?
+
+In this part we would like to find the 5-minute interval which contains the maximum number of steps on average basis for two months. First, we use "melt" and "dcats" finction to create a new data frame which includes average of number of steps for each interval through all days in the study:
+
+```{r}
+datamelt2<-melt(data,id=c("interval"),measure.vars=c("steps"),na.rm=TRUE)
+interval<-dcast(datamelt2,interval~variable,mean)
+head(interval)
+```
+
+```{r   fig.width=7, fig.height=6}
+plot(interval$interval, interval$steps,type="l",xlab="Intervals",ylab="Average of Steps",col="blue",lwd=2)
+```
+
+Now we can easily find the 5-minute interval in which our subject is most active: 
+```{r}
+interval[interval$steps==max(interval$steps),1]
+(interval[interval$steps==max(interval$steps),1])/5
+```
+Which is our 167th interval and is around 13:54. 
+
+## 4.Imputing missing values
+We should find a way to replace the NA values and do all the calculations again and compare the results. 
+First, we are calculating the number of missing values: 
+```{r}
+data1<-data[complete.cases(data$steps),]
+nrow(data)
+nrow(data1)
+No_of_missing<-nrow(data)-nrow(data1)
+No_of_missing
+
+```
+
+Our strategy to replace the NA values is to replace them with the average of steps through all days for each interval, for example if we have missing values for interval 10 for the day of 2012-10-01 and 2012-10-02, they both will be replaced by a same value. 
+```{r}
+newData<-data
+for (i in 1:nrow(newData)){
+  if (is.na(newData[i,1])){
+    newData[i,1]<-interval[(interval[,1]==newData[i,3]),2]
+  }
+}
+head(newData)
+
+```
+Now we use the same method to creat the histogram for the new data set where the NA values were replaced : 
+```{r}
+new_datamelt<-melt(newData,id=c("date"),measure.vars=c("steps"),na.rm=TRUE)
+new_data_sum<-dcast(new_datamelt,date~variable,sum)
+
+```
+
+```{r  fig.width=7, fig.height=6}
+hist(new_data_sum$steps,col="pink",xlab="", main="Histogram2 (NA values replaced)")
+```
+
+```{r}
+mean(new_data_sum$steps)
+median(new_data_sum$steps)
+```
+
+If we compare the new values with those from section 2: 
+```{r  echo=FALSE}
+mean(data_sum$steps)
+median(data_sum$steps)
+```
+*We will see that there is not a big difference between them. We can conclude that ignoring the NA values does not have a huge effect on our analysis.*
+
+## 5.Are there differences in activity patterns between weekdays and weekends?
+
+```{r}
+factorData<-data
+factorData$date<-weekdays(factorData$date)
+head(factorData)
+tail(factorData)
+```
+```{r}
+for (i in 1:nrow(factorData)){
+  if (factorData[i,2]=="Sunday" | factorData[i,2]=="Saturday"){
+    factorData[i,2]<-"weekend"
+  } else {
+    factorData[i,2]<-"weekdays" 
+  }
+}
+head(factorData)
+```
+```{r  fig.width=11, fig.height=6 }
+library(lattice)
+plot<-xyplot(factorData$steps~ factorData$interval | factorData$date, data=factorData, layout = c(1, 2),type="l",xlab="Interval",ylab="Number of Steps") 
+print(plot)
+```
